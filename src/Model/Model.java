@@ -1,189 +1,105 @@
 package Model;
 
-import java.util.ArrayList;
+import Database.DB;
+import Database.Queries;
+import Model.Entities.Candidate;
+import Model.Entities.Citizen;
+import Model.Entities.PoliticalParty;
+import Model.Entities.VotingBox;
 
-import Exceptions.FoundInListsException;
-import View.AlertBox;
-import View.Display;
-import View.ElectionResults;
-import javafx.collections.ObservableList;
+import java.util.List;
 
 public class Model {
-	
-	private Display display;
-	
-	private ArrayList<Citizen> listOfCitizens;
-	private ArrayList<PoliticalParty> listOfPoliticalParties;
-	private ArrayList<VotingBox<Citizen>> listOfVotingBoxs;
-		
-	private ElectionResults electionResults;
-	
-// -----------------------------------------------------------------------------------
+
+	private List[] lists;
+
+	//================================================
 
 	public Model() {
-		this.display = new Display(this);
-		this.listOfCitizens = new ArrayList<>();
-		this.listOfPoliticalParties = new ArrayList<>();
-		this.listOfVotingBoxs = new ArrayList<>();
-		this.electionResults = new ElectionResults(this);
-	}
-	
-// -----------------------------------------------------------------------------------
-	
-	private boolean checkIdExists(String id) {
-		boolean valid = false;
-		try {
-			for (int i = 0; i < listOfCitizens.size(); i++) {
-				if (listOfCitizens.get(i).getId().equals(id)) {
-					valid = true;
-					throw new FoundInListsException(listOfCitizens.get(i).getId());
-				}
-			}
-		} catch(FoundInListsException e) {
-			AlertBox.display("Found In Lists Exception",e.getMessage());
-		}
-		return valid;
-	}
-	
-	public boolean checkVoteBoxExists(VotingBox<Citizen> voteBox) {
-		boolean valid = false;
-		try {
-			for (int i = 0; i < listOfVotingBoxs.size(); i++) {
-				if (listOfVotingBoxs.get(i).equals(voteBox)) {
-					valid = true;
-					throw new FoundInListsException(listOfVotingBoxs.get(i).getAddress());
-				}
-			}
-		} catch(FoundInListsException e) {
-			AlertBox.display("Found In Lists Exception",e.getMessage());
-		}
-		return valid;
-	}
-	
-	public boolean checkPartyExists(PoliticalParty politiParty) {
-		boolean valid = false;
-		try {
-			for (int i = 0; i < listOfPoliticalParties.size(); i++) {
-				if (listOfPoliticalParties.get(i).equals(politiParty)) {
-					valid = true;
-					throw new FoundInListsException(listOfPoliticalParties.get(i).getNamePoliticalParty());
-				}
-			}
-		} catch(FoundInListsException e) {
-			AlertBox.display("Found In Lists Exception",e.getMessage());
-		}
-		return valid;
-	}
-	
-// -----------------------------------------------------------------------------------
+		lists = new List[]{
+				DB.fetch(Queries.GET_ALL_CITIZENS, Queries.CITIZEN),
+				DB.fetch(Queries.GET_CITIZENS_NO_CANDIDATES, Queries.CITIZEN),
+				DB.fetch(Queries.GET_All_CANDIDATES, Queries.CANDIDATE),
+				DB.fetch(Queries.GET_ALL_VOTE_BOXES, Queries.VOTING_BOX),
+				DB.fetch(Queries.GET_ALL_PARTIES, Queries.POLITICAL_PARTY),
+				DB.fetch(Queries.GET_ALL_ELECTIONS, Queries.ELECTIONS)
+		};
 
-	public boolean addCitizen(Citizen citizen) {
-		if (!checkIdExists(citizen.getId())) {
-			this.listOfCitizens.add(citizen);
-			display.getCitizensList().getItems().add(citizen);
+	}
+
+	//================================================
+
+	public boolean add(Object obj) {
+		if (!find(obj)) {
+			listGetter(obj).add(obj);
+			DB.insert(obj);
 			return true;
 		}
 		return false;
 	}
-	
-	public boolean addVotingBox(VotingBox<Citizen> voteBox) {
-		if (!checkVoteBoxExists(voteBox)) {
-			this.listOfVotingBoxs.add(voteBox);
-			display.getVotingBoxsList().getItems().add(voteBox);
-			return true;
-		}
-		return false;
-	}
-	
-	public boolean addPolitiParty(PoliticalParty politiParty) {
-		if (!checkPartyExists(politiParty)) {
-			this.listOfPoliticalParties.add(politiParty);
-			display.getPartiesList().getItems().add(politiParty);
-			addCandidates(politiParty);
-			return true;
-		}
-		return false;
-	}
-	
-	private void addCandidates(PoliticalParty politiParty) {
-		for (int i = 0; i < politiParty.getCandidatesList().size(); i++) {
-			display.getCandidatesList().getItems().add(politiParty.getCandidatesList().get(i));
+
+	private List listGetter(Object obj) {
+		switch (obj.getClass().getSimpleName()){
+			case Citizen.CLASS_NAME:
+				return lists[0];
+			case Candidate.CLASS_NAME:
+				return lists[2];
+			case VotingBox.CLASS_NAME:
+				return lists[3];
+			case PoliticalParty.CLASS_NAME:
+				return lists[4];
+			default:
+				return null;
 		}
 	}
 
-// -----------------------------------------------------------------------------------
+	private boolean find(Object obj) {
+		switch (obj.getClass().getSimpleName()){
+			case Citizen.CLASS_NAME:
+				return lists[0].stream().anyMatch(o -> ((Citizen)obj).getId().equals(((Citizen) o).getId()));
+			case Candidate.CLASS_NAME:
+				return lists[2].stream().anyMatch(o -> ((Candidate)obj).equals((Candidate) o));
+			case VotingBox.CLASS_NAME:
+				return lists[3].stream().anyMatch(o -> ((VotingBox)obj).equals((VotingBox) o));
+			case PoliticalParty.CLASS_NAME:
+				return lists[4].stream().anyMatch(o -> ((PoliticalParty)obj).equals((PoliticalParty) o));
+			default:
+				return false;
+		}
+	}
 
-	public void addCitizens(ArrayList<Citizen> citizensList) {
-		for (int i = 0; i < citizensList.size(); i++) {
-			this.getListOfCitizens().add(citizensList.get(i));
-			this.getDisplay().getCitizensList().getItems().add(citizensList.get(i));
+	//================================================
+
+	public Citizen getCitizenById(String id) {
+		List<Citizen> citizenList = lists[1];
+		for (int j = 0; j < citizenList.size(); j++) {
+			if(citizenList.get(j).getId().equals(id))
+				return citizenList.get(j);
 		}
+		return null;
 	}
-	
-	public void addVotingBoxs(ArrayList<VotingBox<Citizen>> voteboxList) {
-		for (int i = 0; i < voteboxList.size(); i++) {
-			this.getListOfVotingBoxs().add(voteboxList.get(i));
-			this.getDisplay().getVotingBoxsList().getItems().add(voteboxList.get(i));	
-		}
-	}
-	
-	
-	public void addPolitiParty(ArrayList<PoliticalParty> partiesList) {
-		for (int i = 0; i < partiesList.size(); i++) {
-			this.getListOfPoliticalParties().add(partiesList.get(i));
-			this.getDisplay().getPartiesList().getItems().add(partiesList.get(i));
-		}
-	}
-	
-// -----------------------------------------------------------------------------------
 
 	public boolean replace(Citizen citizen) {
-		for (int i = 0; i < listOfCitizens.size(); i++) {
-			if (listOfCitizens.get(i).getId().equals(citizen.getId())) {	
-				listOfCitizens.remove(i);
-				removeFromListView(citizen);
-				listOfCitizens.add(i, citizen);
+		for (int i = 0; i < lists[0].size(); i++) {
+			if (((Citizen)lists[0].get(i)).getId().equals(citizen.getId())) {
+				lists[0].add(i, citizen);
 				return true;
 			}
 		}
 		return false;
 	}
 
-	private void removeFromListView(Citizen citizen) {
-		boolean removed = false;
-		ObservableList<Citizen> citizensObservableList = display.getOnlyCitizensList().getItems();
-		for (int i = 0; i < citizensObservableList.size() && !removed ; i++) {
-			if (citizensObservableList.get(i).getId().equals(citizen.getId())) {
-				citizensObservableList.remove(i);
-				removed = true;
-			}
-		}
-	}
-	
-// -----------------------------------------------------------------------------------
-	
-	public ArrayList<Citizen> getListOfCitizens() {
-		return listOfCitizens;
-	}
+	//================================================
 
-	public ArrayList<PoliticalParty> getListOfPoliticalParties() {
-		return listOfPoliticalParties;
-	}
+	public List getCitizens() { return lists[0]; }
 
-	public ArrayList<VotingBox<Citizen>> getListOfVotingBoxs() {
-		return listOfVotingBoxs;
-	}
+	public List getOnlyCitizens() { return lists[1]; }
 
-	public Display getDisplay() {
-		return display;
-	}
+	public List getVotingBoxs() { return lists[3]; }
 
-	public ElectionResults getElectionResults() {
-		return electionResults;
-	}
+	public List getPoliticalParties() { return lists[4]; }
 
-	public void setElectionResults(ElectionResults electionResults) {
-		this.electionResults = electionResults;
-	}
+	public List getElections() { return lists[5]; }
 
+	public List[] getLists() { return lists; }
 }

@@ -1,128 +1,82 @@
 package Model;
 
+import Controller.Controller;
+import Database.DB;
+import Model.Entities.Candidate;
+import Model.Entities.Citizen;
+import Model.Entities.PoliticalParty;
+import Model.Entities.VotingBox;
 
-import java.util.ArrayList;
-import Model.VotingBox.boxType;
-import javafx.collections.ObservableList;
+import java.util.List;
 
 public class MethodsUtil {
 
-// -----------------------------------------------------------------------------------------------------	
-// Vote Box Distribution methods
-	
+	//================================================ Candidate methods
+
+	public static void citizenToCandidate(Controller cont, Citizen citizen, String namePoliticalParty) {
+		Candidate newCandidate = new Candidate(citizen, namePoliticalParty);
+
+		int partyId = addToPartyCandidateList(cont, newCandidate, namePoliticalParty);
+		newCandidate.setPartyId(partyId);
+
+		DB.insert(newCandidate);
+
+		cont.getModel().replace(newCandidate);
+		cont.getView().add(newCandidate);
+		cont.getView().remove(newCandidate);
+	}
+
+	public static int addToPartyCandidateList(Controller cont, Candidate candidate, String partyName) {
+		List parties = cont.getModel().getPoliticalParties();
+		for (int i = 0; i < parties.size(); i++) {
+			PoliticalParty tmpParty = (PoliticalParty) parties.get(i);
+			if (tmpParty.getName().equalsIgnoreCase(partyName)) {
+				cont.getView().getCandidates().getItems().add(candidate);
+				tmpParty.getCandidatesList().add(candidate);
+				return parties.indexOf(tmpParty)+1;
+			}
+		}
+		return -1;
+	}
+
+	//================================================ Vote Box Distribution methods
+
 	// determines and sets citizen correct voting box
-	public static void setCorrectVotingBox(Citizen citizen, ArrayList<VotingBox<Citizen>> listOfVotingBoxs) {
-		
-		VotingBox.boxType boxType;
-		// SetOrShow = "set" sets to correct vote box , "show" shows eligible vote box
+	public static void setCorrectVotingBox(Citizen citizen, List listOfVotingBoxs) {
+		VotingBox.BoxType boxType;
 		if (citizen.getInsulation()) { // if insulated citizen/soldier set/show corona voting box
-			if (citizen.checkIfSoldier()) {
-				boxType = VotingBox.boxType.CoronaArmy;
-				voteBoxSetter(listOfVotingBoxs, boxType, citizen);
-			}
-			if (citizen.getAge() >= 21) {
-				boxType = VotingBox.boxType.Corona;
-				voteBoxSetter(listOfVotingBoxs, boxType, citizen);
-			}
+			if (citizen.checkIfSoldier())
+				boxType = VotingBox.BoxType.ArmyCorona;
+			else
+				boxType = VotingBox.BoxType.Corona;
 		} else {
-			if (citizen.checkIfSoldier()) { // if healthy soldier set/show army voting box
-				boxType = VotingBox.boxType.Army;
-				voteBoxSetter(listOfVotingBoxs, boxType, citizen);
-			}
-			if (citizen.getAge() >= 21) { // if healthy citizen set/show normal voting box
-				boxType = VotingBox.boxType.Normal;
-				voteBoxSetter(listOfVotingBoxs, boxType, citizen);
-			}
+			if (citizen.checkIfSoldier()) // if healthy soldier set/show army voting box
+				boxType = VotingBox.BoxType.Army;
+			else  // if healthy citizen set/show normal voting box
+				boxType = VotingBox.BoxType.Normal;
 		}
+		voteBoxSetter(listOfVotingBoxs, boxType, citizen);
 	}
-	
+
 	// setCorrectVotingBox Helper
-	private static void voteBoxSetter(ArrayList<VotingBox<Citizen>> listOfVotingBoxs, VotingBox.boxType boxType	, Citizen citizen) {
-		VotingBox.boxType chosenBoxType = listOfVotingBoxs.get(citizen.getVotingBooth()).getBoxType();
-		ArrayList<Citizen> chosenVotingBoxList = listOfVotingBoxs.get(citizen.getVotingBooth()).getListOfCitizen();
-		
-		if (chosenBoxType != boxType) { // if wrong voting box type is chosen
-			boolean citizenAdded = false; 	// loop descend so citizen distribution in voting boxes will be better
-			for (int i = listOfVotingBoxs.size() - 1; i >= 0 || !citizenAdded; i--) {
-				VotingBox<Citizen> iVoteBox = listOfVotingBoxs.get(i);
-				if (iVoteBox.getBoxType().equals(boxType)) {
-					citizenAdded = true;
-					citizen.setVotingBooth(iVoteBox.getId());
-					iVoteBox.getListOfCitizen().add(citizen);
-				}
+	private static void voteBoxSetter(List listOfVotingBoxs, VotingBox.BoxType boxType, Citizen citizen) {
+		for (int i = listOfVotingBoxs.size() - 1; i >= 0 ; i--) {
+			VotingBox iVoteBox = (VotingBox) listOfVotingBoxs.get(i);
+			if (iVoteBox.getBoxType().equals(boxType)) {
+				citizen.setVotingBooth(iVoteBox.getId());
+				iVoteBox.getListOfCitizen().add(citizen);
+				return;
 			}
-		}
-		else { // if citizen/soldier chose eligible voting box
-			chosenVotingBoxList.add(citizen);
-			citizen.setVotingBooth(citizen.getVotingBooth()+1);
 		}
 	}
 
-	public static ArrayList<VotingBox.boxType> getAllTheTypesOfVotingBox () {
-		ArrayList<VotingBox.boxType> boxTypeNames =new ArrayList<>();
-		for (boxType Types  : boxType.values()) { 
-		    boxTypeNames.add(Types);
-		}
-		return boxTypeNames;
-	}
-	
-	
 	public static void resetAllVotes(Model model) {
-		for (int i = 0; i < model.getListOfCitizens().size(); i++) {
-			model.getListOfCitizens().get(i).setVotedFor(null);
+		List ctzns = model.getCitizens();
+		for (int i = 0; i < ctzns.size(); i++) {
+			((Citizen)ctzns.get(i)).setVotedFor(null);
 		}
 	}
-// -----------------------------------------------------------------------------------------------------		
-// Citizen methods
 
-	public static Citizen getCitizenById(String id, Model model) {
-		ObservableList<Citizen> citizenList = model.getDisplay().getOnlyCitizensList().getItems();
-			for (int j = 0; j < citizenList.size(); j++) {
-				if(citizenList.get(j).getId().equals(id))
-					return citizenList.get(j);
-			}
-		return null;		
-	}
-	
-// -----------------------------------------------------------------------------------------------------		
-// Candidate methods
-
-	public static boolean citizenToCandidate(Model model, Citizen citizen, String namePoliticalParty) {
-		boolean candidateAdded = false;
-		for (int i = 0; i < model.getListOfVotingBoxs().size() || !candidateAdded; i++) {
-			ArrayList<Citizen> citizenList = model.getListOfVotingBoxs().get(i).getListOfCitizen();
-			for (int j = 0; j < citizenList.size() && !candidateAdded; j++) {
-				// loops until find the correct citizen and makes him candidate
-				Citizen tmpCitizen = citizenList.get(j);
-				if (tmpCitizen.equals(citizen)) {
-					// puts candidate in old citizen voting box spot
-					Candidate newCandidate = new Candidate(tmpCitizen.getName(), citizen.getId(), tmpCitizen.getYearOfBirth(),
-																	 tmpCitizen.getInsulation(), 
-																	 tmpCitizen.getNumberOfSickDays(), 
-																		namePoliticalParty);
-					newCandidate.setVotingBooth(citizen.getVotingBooth());
-					model.replace(newCandidate);
-					addToPartyCandidateList(model, newCandidate, namePoliticalParty);
-					candidateAdded = true;
-				}
-			}
-		}
-		return candidateAdded;
-	}
-	
-	public static void addToPartyCandidateList(Model model, Candidate candidate, String namePoliticalParty) {	
-		boolean added = false;
-		for (int i = 0; i < model.getListOfPoliticalParties().size() && !added; i++) {
-			// adds candidate to candidates list
-			PoliticalParty tmpParty = model.getListOfPoliticalParties().get(i);
-			model.getDisplay().getCandidatesList().getItems().add(candidate);
-			if (tmpParty.getNamePoliticalParty().equalsIgnoreCase(namePoliticalParty)) {
-					tmpParty.getCandidatesList().add(candidate);
-					added = true;
-			}
-		}
-	}
-	
-// -----------------------------------------------------------------------------------------------------		
+	//================================================
 
 }
