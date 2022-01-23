@@ -51,14 +51,14 @@ public class Controller {
 		results.fillPiechart(model);
 		DB.insert(results);
 
-		Set<Map.Entry <String, Integer>> partiesSet = results.getPartiesVotes().entrySet();
+		Set partiesSet = results.getPartiesVotes().entrySet();
 		int electionId = model.getElections().size()+1;
 		int partyId = 0;
-		for (Map.Entry <String, Integer> entry : partiesSet){
+		for (Object entry : partiesSet){
 			PartyResults partyresults = new PartyResults(
 					electionId,
 					partyId,
-					entry.getValue());
+					((Map.Entry <String, Integer>) entry).getValue());
 			DB.insert(partyresults);
 			partyId++;
 		}
@@ -78,8 +78,6 @@ public class Controller {
 		}
 		return false;
 	}
-
-	//================================================
 
 	private String getExceptionDetails(Object obj) {
 		switch (obj.getClass().getSimpleName()){
